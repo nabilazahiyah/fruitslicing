@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <title>Fruit Slice - Modul Viskom</title>
+  <style>
+    body { margin: 0; background: #222; text-align: center; color: white; font-family: sans-serif; }
+    #canvas-container { position: relative; display: inline-block; margin-top: 20px; }
+    canvas { border: 2px solid #ff9900; background: #000; border-radius: 8px; }
+    video { display: none; }
+  </style>
+
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <h2>Fruit Slicing - Viskom Hand Tracking</h2>
+  <div id="canvas-container">
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output_canvas" width="640" height="480"></canvas>
+  </div>
+  <p id="status">Status: Meminta akses kamera...</p>
+
+  <script>
+    const videoElement = document.getElementById('webcam');
+    const canvasElement = document.getElementById('output_canvas');
+    const canvasCtx = canvasElement.getContext('2d');
+    const statusText = document.getElementById('status');
+
+    // Jejak berbasis waktu: { x, y, t }
+    let sliceTrail = [];
+    const TRAIL_LIFETIME = 250;   // ms, berapa lama titik jejak bertahan
+    const STROKE_GAP = 300;       // ms, jeda maksimum agar titik masih tersambung
+
+    const hands = new Hands({
+      locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`
+    });
+
+    hands.setOptions({
+      maxNumHands: 2,
+      modelComplexity: 0,           
+      minDetectionConfidence: 0.5,   
+      minTrackingConfidence: 0.5
+    });
+
+    hands.onResults(onResults);
+
+    // Hasil deteksi: hanya menambah titik, TIDAK menggambar
+    function onResults(results) {
+      statusText.innerText = "Status: Tracking Aktif! Gerakkan jari telunjuk.";
+
+      if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+        const tip = results.multiHandLandmarks[0][8]; // ujung telunjuk
+        const now = performance.now();
+
+        const x = (1 - tip.x) * canvasElement.width; // mirror
+        const y = tip.y * canvasElement.height;
+
+        // Mulai stroke baru bila jeda terlalu lama
+        const last = sliceTrail[sliceTrail.length - 1];
+        const newStroke = !last || (now - last.t) > STROKE_GAP;
+
+        sliceTrail.push({ x, y, t: now, start: newStroke });
+      }
+      // Jika tangan tidak terdeteksi: jejak TIDAK dihapus, hilang sendiri oleh waktu
+    }
+
+    // Loop render terpisah dari deteksi
+    function render() {
+      const now = performance.now();
+
+      // Gambar video (mirror)
+      canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.save();
+      canvasCtx.scale(-1, 1);
+      canvasCtx.translate(-canvasElement.width, 0);
+      canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+      canvasCtx.restore();
+
+      // Buang titik yang sudah kedaluwarsa
+      sliceTrail = sliceTrail.filter(p => now - p.t < TRAIL_LIFETIME);
+
+      drawSliceTrail(now);
+      requestAnimationFrame(render);
+    }
+
+    // Gambar jejak: meruncing & memudar sesuai umur titik
+    function drawSliceTrail(now) {
+      if (sliceTrail.length < 2) return;
+
+      canvasCtx.save();
+      canvasCtx.lineCap = 'round';
+      canvasCtx.lineJoin = 'round';
+      canvasCtx.strokeStyle = '#00ffff';
+      canvasCtx.shadowColor = '#00ffff';
+      canvasCtx.shadowBlur = 10;
+
+      for (let i = 1; i < sliceTrail.length; i++) {
+        const p = sliceTrail[i];
+        if (p.start) continue; // jangan sambungkan stroke berbeda
+
+        const prev = sliceTrail[i - 1];
+        const life = 1 - (now - p.t) / TRAIL_LIFETIME; // 1 = baru, 0 = hilang
+
+        canvasCtx.globalAlpha = Math.max(life, 0);
+        canvasCtx.lineWidth = 2 + 8 * life;
+
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(prev.x, prev.y);
+        canvasCtx.lineTo(p.x, p.y);
+        canvasCtx.stroke();
+      }
+
+      canvasCtx.restore();
+    }
+
+    // Jalankan kamera
+    const camera = new Camera(videoElement, {
+      onFrame: async () => {
+        await hands.send({ image: videoElement });
+      },
+      width: 640,
+      height: 480
+    });
+
+    camera.start()
+      .then(() => requestAnimationFrame(render))
+      .catch(err => {
+        statusText.innerText = "Error Kamera: " + err.message + " (Pastikan izin webcam diberikan)";
+      });
+  </script>
+</body>
+</html>
