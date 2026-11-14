@@ -2,75 +2,1165 @@
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Fruit Slice - Modul Viskom</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fruit Slicing - Viskom Hand Tracking</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    body { margin: 0; background: #222; text-align: center; color: white; font-family: sans-serif; }
-    #canvas-container { position: relative; display: inline-block; margin-top: 20px; }
-    canvas { border: 2px solid #ff9900; background: #000; border-radius: 8px; }
-    video { display: none; }
+    :root {
+      --bg-dark: #0b0f19;
+      --panel-bg: rgba(17, 24, 39, 0.9);
+      --accent-cyan: #00f5d4;
+      --accent-gold: #ffb703;
+      --accent-red: #ff4d6d;
+      --border-glow: rgba(0, 245, 212, 0.4);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      min-height: 100vh;
+      background: radial-gradient(circle at top, #1e1b4b 0%, var(--bg-dark) 70%);
+      color: #f8fafc;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 12px 16px;
+      overflow-x: hidden;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 10px;
+    }
+
+    header h1 {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 2.1rem;
+      letter-spacing: 1px;
+      background: linear-gradient(90deg, #ffbe0b, #fb5607, #ff006e, #00f5d4);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      text-shadow: 0 4px 20px rgba(255, 183, 3, 0.25);
+    }
+
+    header p {
+      font-size: 0.88rem;
+      color: #94a3b8;
+      margin-top: 2px;
+    }
+
+    /* Wrapper Utama Game */
+    .game-wrapper {
+      position: relative;
+      width: 96vw;
+      max-width: 1160px;
+      background: var(--panel-bg);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 22px;
+      padding: 14px 16px;
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(0, 245, 212, 0.1);
+      backdrop-filter: blur(12px);
+      display: flex;
+      flex-direction: column;
+    }
+
+    .game-wrapper:fullscreen {
+      width: 100vw;
+      height: 100vh;
+      max-width: none;
+      border-radius: 0;
+      padding: 12px 24px;
+      justify-content: space-between;
+    }
+
+    /* Baris HUD Atas */
+    .hud-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 12px;
+      padding: 10px 18px;
+      background: rgba(15, 23, 42, 0.92);
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      flex-wrap: wrap;
+    }
+
+    .hud-group {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+    }
+
+    .stat-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .stat-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      font-weight: 700;
+    }
+
+    .stat-value {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.65rem;
+      font-weight: 700;
+      color: var(--accent-gold);
+      line-height: 1.1;
+    }
+
+    .stat-value.best {
+      color: var(--accent-cyan);
+      font-size: 1.35rem;
+    }
+
+    /* Indikator Nyawa Berbasis Bar Modern (Tanpa Ikon) */
+    .lives-wrapper {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .lives-pips {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .life-pip {
+      width: 34px;
+      height: 12px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      transition: all 0.25s ease;
+    }
+
+    .life-pip.active {
+      background: linear-gradient(90deg, #ff4d6d, #ff758f);
+      border-color: #ffb3c1;
+      box-shadow: 0 0 12px rgba(255, 77, 109, 0.7);
+    }
+
+    .hud-controls {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .badge-fps {
+      background: rgba(0, 245, 212, 0.12);
+      color: var(--accent-cyan);
+      border: 1px solid rgba(0, 245, 212, 0.3);
+      padding: 7px 12px;
+      border-radius: 8px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .btn-hud {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      color: #f1f5f9;
+      height: 36px;
+      padding: 0 14px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-size: 0.8rem;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .btn-hud:hover {
+      background: rgba(255, 255, 255, 0.18);
+      transform: translateY(-1px);
+    }
+
+    /* Area Canvas */
+    #canvas-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      max-height: 76vh;
+      margin: 0 auto;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 2px solid var(--border-glow);
+      background: #050811;
+    }
+
+    .game-wrapper:fullscreen #canvas-container {
+      max-height: calc(100vh - 125px);
+      width: auto;
+      aspect-ratio: 4 / 3;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+
+    video {
+      display: none;
+    }
+
+    /* Overlay Menu Start, Bomb Hit & Game Over */
+    .overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(9, 13, 24, 0.82);
+      backdrop-filter: blur(7px);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 28px;
+      z-index: 10;
+      transition: opacity 0.25s ease;
+    }
+
+    .overlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .overlay-badge {
+      background: rgba(255, 183, 3, 0.15);
+      color: var(--accent-gold);
+      border: 1px solid rgba(255, 183, 3, 0.4);
+      padding: 5px 16px;
+      border-radius: 999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      margin-bottom: 12px;
+      letter-spacing: 0.8px;
+    }
+
+    .overlay h2 {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 2.5rem;
+      margin-bottom: 10px;
+      color: #ffffff;
+    }
+
+    .overlay p {
+      max-width: 480px;
+      color: #cbd5e1;
+      font-size: 0.96rem;
+      line-height: 1.5;
+      margin-bottom: 22px;
+    }
+
+    .tips-grid {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 24px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .tip-card {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 9px 16px;
+      border-radius: 10px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: #e2e8f0;
+    }
+
+    .btn-group {
+      display: flex;
+      gap: 14px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+
+    .btn-primary {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 600;
+      padding: 13px 32px;
+      border: none;
+      border-radius: 12px;
+      background: linear-gradient(135deg, #00f5d4 0%, #00bbf9 100%);
+      color: #06121e;
+      cursor: pointer;
+      box-shadow: 0 8px 25px rgba(0, 245, 212, 0.35);
+      transition: transform 0.18s ease, box-shadow 0.18s ease;
+    }
+
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px) scale(1.03);
+      box-shadow: 0 12px 30px rgba(0, 245, 212, 0.55);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .btn-secondary {
+      font-family: 'Fredoka', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 600;
+      padding: 13px 28px;
+      border: 2px solid rgba(255, 183, 3, 0.65);
+      border-radius: 12px;
+      background: rgba(255, 183, 3, 0.14);
+      color: #ffd166;
+      cursor: pointer;
+      transition: transform 0.18s ease, background 0.18s ease;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 183, 3, 0.26);
+      transform: translateY(-2px) scale(1.03);
+    }
+
+    .final-stats {
+      display: flex;
+      gap: 28px;
+      margin-bottom: 24px;
+      background: rgba(255, 255, 255, 0.06);
+      padding: 14px 28px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .bomb-lives-box {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 24px;
+      background: rgba(255, 77, 109, 0.12);
+      border: 1px solid rgba(255, 77, 109, 0.35);
+      padding: 14px 28px;
+      border-radius: 14px;
+    }
+
+    .bomb-lives-box span {
+      font-size: 0.82rem;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #ffb3c1;
+      text-transform: uppercase;
+    }
+
+    /* Footer Status */
+    .status-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 10px;
+      padding: 0 4px;
+      font-size: 0.84rem;
+      color: #94a3b8;
+    }
+
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #f59e0b;
+      box-shadow: 0 0 8px #f59e0b;
+    }
+
+    .dot.active {
+      background: #10b981;
+      box-shadow: 0 0 8px #10b981;
+    }
+
+    .dot.error {
+      background: #ef4444;
+      box-shadow: 0 0 8px #ef4444;
+    }
   </style>
 
+  <!-- MediaPipe Hands & Camera Utils -->
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
 </head>
 <body>
 
-  <h2>Fruit Slicing - Viskom Hand Tracking</h2>
-  <div id="canvas-container">
-    <video id="webcam" autoplay playsinline></video>
-    <canvas id="output_canvas" width="640" height="480"></canvas>
+  <header>
+    <h1>FRUIT SLICING ARENA</h1>
+    <p>Kendali Gestur Tangan Real-Time • MediaPipe Computer Vision</p>
+  </header>
+
+  <div class="game-wrapper" id="game-wrapper">
+    <!-- HUD Atas -->
+    <div class="hud-bar">
+      <div class="hud-group">
+        <div class="stat-box">
+          <span class="stat-label">Skor</span>
+          <span class="stat-value" id="score-display">0</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Terbaik</span>
+          <span class="stat-value best" id="highscore-display">0</span>
+        </div>
+      </div>
+
+      <div class="lives-wrapper" title="Sisa Nyawa">
+        <span class="stat-label">Nyawa (<span id="lives-count-text">3</span>/3)</span>
+        <div class="lives-pips" id="lives-display">
+          <div class="life-pip active"></div>
+          <div class="life-pip active"></div>
+          <div class="life-pip active"></div>
+        </div>
+      </div>
+
+      <div class="hud-controls">
+        <span class="badge-fps" id="fps-display">FPS: --</span>
+        <button class="btn-hud" id="sound-toggle">Suara: ON</button>
+        <button class="btn-hud" id="fullscreen-toggle">Layar Penuh</button>
+      </div>
+    </div>
+
+    <!-- Container Canvas & Overlay -->
+    <div id="canvas-container">
+      <video id="webcam" autoplay playsinline></video>
+      <canvas id="output_canvas" width="960" height="720"></canvas>
+
+      <!-- Overlay Start Screen -->
+      <div class="overlay" id="start-overlay">
+        <span class="overlay-badge">HAND TRACKING READY</span>
+        <h2>Siap Menebas Buah?</h2>
+        <p>Arahkan <strong>jari telunjuk</strong> ke depan kamera dan ayunkan dengan cepat untuk memotong buah-buah besar yang melayang.</p>
+        <div class="tips-grid">
+          <div class="tip-card">Tebas Buah = +10~20 Poin</div>
+          <div class="tip-card">3+ Buah Sekaligus = Combo</div>
+          <div class="tip-card">Kena Bom = -1 Nyawa</div>
+        </div>
+        <button class="btn-primary" id="start-btn" disabled>Menunggu Kamera...</button>
+      </div>
+
+      <!-- Overlay Terkena Bom (Nyawa Masih Tersisa) -->
+      <div class="overlay hidden" id="bomb-overlay">
+        <span class="overlay-badge" style="color: #ff4d6d; border-color: rgba(255,77,109,0.45); background: rgba(255,77,109,0.15);">PERINGATAN LEDAKAN</span>
+        <h2>Terkena Bom!</h2>
+        <p>Kamu terkena bom dan kehilangan <strong>1 nyawa</strong>. Pilih lanjutkan dengan sisa nyawa saat ini atau ulang dari awal.</p>
+        <div class="bomb-lives-box">
+          <span id="bomb-lives-label">Sisa Nyawa: 2 / 3</span>
+          <div class="lives-pips" id="bomb-lives-display">
+            <div class="life-pip active"></div>
+            <div class="life-pip active"></div>
+            <div class="life-pip"></div>
+          </div>
+        </div>
+        <div class="btn-group">
+          <button class="btn-primary" id="continue-btn">Lanjutkan (Sisa Nyawa)</button>
+          <button class="btn-secondary" id="bomb-restart-btn">Ulang dari Awal</button>
+        </div>
+      </div>
+
+      <!-- Overlay Game Over (Nyawa Habis = 0) -->
+      <div class="overlay hidden" id="gameover-overlay">
+        <span class="overlay-badge" style="color: #ff4d6d; border-color: rgba(255,77,109,0.4); background: rgba(255,77,109,0.12);">PERMAINAN SELESAI</span>
+        <h2 id="gameover-title">Game Over!</h2>
+        <div class="final-stats">
+          <div class="stat-box" style="align-items: center;">
+            <span class="stat-label">Skor Akhir</span>
+            <span class="stat-value" id="final-score">0</span>
+          </div>
+          <div class="stat-box" style="align-items: center;">
+            <span class="stat-label">Buah Terpotong</span>
+            <span class="stat-value best" id="final-sliced">0</span>
+          </div>
+        </div>
+        <button class="btn-primary" id="restart-btn">Ulang dari Awal</button>
+      </div>
+    </div>
+
+    <!-- Status Bar Bawah -->
+    <div class="status-bar">
+      <div class="status-indicator">
+        <span class="dot" id="status-dot"></span>
+        <span id="status">Status: Meminta akses kamera...</span>
+      </div>
+      <span>Tip: Klik tombol Layar Penuh di kanan atas untuk memperluas tampilan</span>
+    </div>
   </div>
-  <p id="status">Status: Meminta akses kamera...</p>
 
   <script>
+    // ==========================================
+    // 1. INISIALISASI ELEMEN & KONFIGURASI
+    // ==========================================
+    const gameWrapper = document.getElementById('game-wrapper');
     const videoElement = document.getElementById('webcam');
     const canvasElement = document.getElementById('output_canvas');
     const canvasCtx = canvasElement.getContext('2d');
+
     const statusText = document.getElementById('status');
+    const statusDot = document.getElementById('status-dot');
+    const scoreDisplay = document.getElementById('score-display');
+    const highscoreDisplay = document.getElementById('highscore-display');
+    const livesDisplay = document.getElementById('lives-display');
+    const livesCountText = document.getElementById('lives-count-text');
+    const fpsDisplay = document.getElementById('fps-display');
 
-    // Jejak berbasis waktu: { x, y, t }
+    const startOverlay = document.getElementById('start-overlay');
+    const bombOverlay = document.getElementById('bomb-overlay');
+    const bombLivesLabel = document.getElementById('bomb-lives-label');
+    const bombLivesDisplay = document.getElementById('bomb-lives-display');
+    const gameoverOverlay = document.getElementById('gameover-overlay');
+    const gameoverTitle = document.getElementById('gameover-title');
+    const finalScoreEl = document.getElementById('final-score');
+    const finalSlicedEl = document.getElementById('final-sliced');
+
+    const startBtn = document.getElementById('start-btn');
+    const continueBtn = document.getElementById('continue-btn');
+    const bombRestartBtn = document.getElementById('bomb-restart-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const soundToggleBtn = document.getElementById('sound-toggle');
+    const fullscreenToggleBtn = document.getElementById('fullscreen-toggle');
+
+    // Konfigurasi Jejak Tebasan (Anti-hilang saat gerakan jari cepat)
     let sliceTrail = [];
-    const TRAIL_LIFETIME = 250;   // ms, berapa lama titik jejak bertahan
-    const STROKE_GAP = 300;       // ms, jeda maksimum agar titik masih tersambung
+    const TRAIL_LIFETIME = 420;     // ms: durasi jejak bertahan
+    const STROKE_GAP = 480;         // ms: toleransi tinggi jika kamera motion-blur saat swipe cepat
+    const MIN_SLICE_SPEED = 0.14;   // px/ms: responsif terhadap tebasan cepat maupun sedang
 
+    // Status Game
+    let gameState = 'MENU';         // 'MENU' | 'PLAYING' | 'BOMB_HIT' | 'GAMEOVER'
+    let cameraReady = false;
+    let score = 0;
+    let highScore = parseInt(localStorage.getItem('fruitSliceHighScore') || '0', 10);
+    let lives = 3;
+    let slicedCount = 0;
+    let soundEnabled = true;
+
+    highscoreDisplay.innerText = highScore;
+
+    // Objek Game
+    let fruits = [];
+    let slicedHalves = [];
+    let particles = [];
+    let floatingTexts = [];
+    let lastSpawnTime = 0;
+    let screenShake = 0;
+    let flashAlpha = 0;
+
+    // Pelacakan Combo & FPS
+    let comboCount = 0;
+    let comboTimer = null;
+    let lastComboPos = { x: 480, y: 360 };
+    let frameCount = 0;
+    let lastFpsUpdate = performance.now();
+
+    // Katalog Buah Besar & Warna-Warni Cerah
+    const FRUIT_TYPES = [
+      {
+        name: 'Semangka',
+        radius: 66,
+        skinOuter: '#00b894',
+        skinInner: '#006266',
+        fleshOuter: '#ff2e63',
+        fleshInner: '#ff758f',
+        seedColor: '#1e272e',
+        hasLeaf: false,
+        showFleshWhole: false,
+        points: 10
+      },
+      {
+        name: 'Jeruk',
+        radius: 58,
+        skinOuter: '#ff9f1c',
+        skinInner: '#ff5400',
+        fleshOuter: '#ffbe0b',
+        fleshInner: '#fff3b0',
+        seedColor: '#ffffff',
+        hasLeaf: true,
+        showFleshWhole: false,
+        points: 10
+      },
+      {
+        name: 'Buah Naga',
+        radius: 62,
+        skinOuter: '#ff007f',
+        skinInner: '#b5179e',
+        fleshOuter: '#ffffff',
+        fleshInner: '#f8edeb',
+        seedColor: '#111111',
+        hasLeaf: true,
+        showFleshWhole: false,
+        points: 20
+      },
+      {
+        name: 'Lemon',
+        radius: 56,
+        skinOuter: '#fee440',
+        skinInner: '#f7b801',
+        fleshOuter: '#ffff3f',
+        fleshInner: '#ffffff',
+        seedColor: '#ffffff',
+        hasLeaf: true,
+        showFleshWhole: false,
+        points: 15
+      },
+      {
+        name: 'Apel Merah',
+        radius: 58,
+        skinOuter: '#ff1e56',
+        skinInner: '#9b0000',
+        fleshOuter: '#ffe5ec',
+        fleshInner: '#fff0f3',
+        seedColor: '#5c2c06',
+        hasLeaf: true,
+        showFleshWhole: false,
+        points: 15
+      },
+      {
+        name: 'Kiwi Neon',
+        radius: 56,
+        skinOuter: '#70e000',
+        skinInner: '#38b000',
+        fleshOuter: '#ccff33',
+        fleshInner: '#fffffc',
+        seedColor: '#1b4332',
+        hasLeaf: false,
+        showFleshWhole: true,
+        points: 15
+      }
+    ];
+
+    // ==========================================
+    // 2. EFEK SUARA SINTETIS & KONTROL HUD
+    // ==========================================
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    let audioCtx = null;
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new AudioCtx();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+    }
+
+    function playSound(type) {
+      if (!soundEnabled) return;
+      initAudio();
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      if (type === 'slice') {
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(540, now);
+        osc.frequency.exponentialRampToValueAtTime(150, now + 0.14);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+        osc.start(now);
+        osc.stop(now + 0.14);
+      } else if (type === 'combo') {
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(587.33, now);
+        osc.frequency.setValueAtTime(880, now + 0.08);
+        gain.gain.setValueAtTime(0.25, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+        osc.start(now);
+        osc.stop(now + 0.28);
+      } else if (type === 'bomb') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(130, now);
+        osc.frequency.exponentialRampToValueAtTime(30, now + 0.55);
+        gain.gain.setValueAtTime(0.4, now);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+        osc.start(now);
+        osc.stop(now + 0.55);
+      }
+    }
+
+    soundToggleBtn.addEventListener('click', () => {
+      soundEnabled = !soundEnabled;
+      soundToggleBtn.innerText = soundEnabled ? 'Suara: ON' : 'Suara: OFF';
+    });
+
+    fullscreenToggleBtn.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        gameWrapper.requestFullscreen().catch(() => {});
+      } else {
+        document.exitFullscreen().catch(() => {});
+      }
+    });
+
+    document.addEventListener('fullscreenchange', () => {
+      fullscreenToggleBtn.innerText = document.fullscreenElement ? 'Keluar Layar Penuh' : 'Layar Penuh';
+    });
+
+    // ==========================================
+    // 3. SETUP MEDIAPIPE HANDS
+    // ==========================================
     const hands = new Hands({
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${file}`
     });
 
     hands.setOptions({
-      maxNumHands: 2,
-      modelComplexity: 0,           
-      minDetectionConfidence: 0.5,   
-      minTrackingConfidence: 0.5
+      maxNumHands: 1,
+      modelComplexity: 0,
+      minDetectionConfidence: 0.45,
+      minTrackingConfidence: 0.45
     });
 
     hands.onResults(onResults);
 
-    // Hasil deteksi: hanya menambah titik, TIDAK menggambar
     function onResults(results) {
-      statusText.innerText = "Status: Tracking Aktif! Gerakkan jari telunjuk.";
+      if (!cameraReady) {
+        cameraReady = true;
+        statusDot.className = 'dot active';
+        statusText.innerText = 'Status: Hand Tracking Aktif! Arahkan jari telunjuk.';
+        startBtn.disabled = false;
+        startBtn.innerText = 'Mulai Bermain';
+      }
 
       if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-        const tip = results.multiHandLandmarks[0][8]; // ujung telunjuk
+        const tip = results.multiHandLandmarks[0][8]; // Ujung jari telunjuk
         const now = performance.now();
 
-        const x = (1 - tip.x) * canvasElement.width; // mirror
+        const x = (1 - tip.x) * canvasElement.width; // Mirror horizontal
         const y = tip.y * canvasElement.height;
 
-        // Mulai stroke baru bila jeda terlalu lama
         const last = sliceTrail[sliceTrail.length - 1];
         const newStroke = !last || (now - last.t) > STROKE_GAP;
 
         sliceTrail.push({ x, y, t: now, start: newStroke });
       }
-      // Jika tangan tidak terdeteksi: jejak TIDAK dihapus, hilang sendiri oleh waktu
     }
 
-    // Loop render terpisah dari deteksi
+    // ==========================================
+    // 4. LOGIKA GAME, BOM & RESET NYAWA
+    // ==========================================
+    function renderLifePips(container, currentLives) {
+      const safeLives = Math.max(0, currentLives);
+      let html = '';
+      for (let i = 0; i < 3; i++) {
+        html += `<div class="life-pip ${i < safeLives ? 'active' : ''}"></div>`;
+      }
+      container.innerHTML = html;
+    }
+
+    // Ulang dari Awal: Hati kembali penuh (3), skor & objek reset
+    function startGame() {
+      initAudio();
+      score = 0;
+      lives = 3;
+      slicedCount = 0;
+      comboCount = 0;
+      clearTimeout(comboTimer);
+
+      fruits = [];
+      slicedHalves = [];
+      particles = [];
+      floatingTexts = [];
+      sliceTrail = [];
+      screenShake = 0;
+      flashAlpha = 0;
+      lastSpawnTime = performance.now();
+
+      updateHUD();
+      gameState = 'PLAYING';
+      startOverlay.classList.add('hidden');
+      bombOverlay.classList.add('hidden');
+      gameoverOverlay.classList.add('hidden');
+    }
+
+    // Lanjutkan setelah kena bom (skor tetap, nyawa berkurang 1)
+    function resumeGame() {
+      initAudio();
+      fruits = [];
+      sliceTrail = [];
+      comboCount = 0;
+      clearTimeout(comboTimer);
+      lastSpawnTime = performance.now();
+
+      gameState = 'PLAYING';
+      bombOverlay.classList.add('hidden');
+    }
+
+    function handleBombHit(bomb) {
+      playSound('bomb');
+      screenShake = 26;
+      flashAlpha = 0.85;
+      createJuiceSplash(bomb.x, bomb.y, ['#ff4d6d', '#ffbe0b', '#ffffff']);
+
+      lives--;
+      updateHUD();
+      clearTimeout(comboTimer);
+      comboCount = 0;
+
+      if (lives <= 0) {
+        endGame('Kehabisan Nyawa!');
+      } else {
+        gameState = 'BOMB_HIT';
+        bombLivesLabel.innerText = `Sisa Nyawa: ${lives} / 3`;
+        renderLifePips(bombLivesDisplay, lives);
+        bombOverlay.classList.remove('hidden');
+      }
+    }
+
+    function endGame(reason = 'Game Over!') {
+      gameState = 'GAMEOVER';
+      gameoverTitle.innerText = reason;
+      finalScoreEl.innerText = score;
+      finalSlicedEl.innerText = slicedCount;
+
+      if (score > highScore) {
+        highScore = score;
+        localStorage.setItem('fruitSliceHighScore', highScore);
+        highscoreDisplay.innerText = highScore;
+      }
+
+      bombOverlay.classList.add('hidden');
+      gameoverOverlay.classList.remove('hidden');
+    }
+
+    function updateHUD() {
+      scoreDisplay.innerText = score;
+      livesCountText.innerText = Math.max(0, lives);
+      renderLifePips(livesDisplay, lives);
+    }
+
+    startBtn.addEventListener('click', startGame);
+    continueBtn.addEventListener('click', resumeGame);
+    bombRestartBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', startGame);
+
+    function spawnWave() {
+      const difficulty = Math.min(4, 1 + Math.floor(score / 120));
+      const count = Math.floor(Math.random() * difficulty) + 1;
+
+      for (let i = 0; i < count; i++) {
+        const isBomb = score >= 20 && Math.random() < 0.22;
+        const margin = 135;
+        const x = margin + Math.random() * (canvasElement.width - margin * 2);
+        const y = canvasElement.height + 65;
+
+        const centerOffset = (canvasElement.width / 2 - x) * 0.008;
+        const vx = centerOffset + (Math.random() - 0.5) * 3.2;
+        const vy = -(15.2 + Math.random() * 3.8);
+
+        if (isBomb) {
+          fruits.push({
+            x, y, vx, vy,
+            radius: 48,
+            rotation: 0,
+            vRot: (Math.random() - 0.5) * 0.12,
+            isBomb: true,
+            sliced: false
+          });
+        } else {
+          const type = FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)];
+          fruits.push({
+            ...type,
+            x, y, vx, vy,
+            rotation: Math.random() * Math.PI * 2,
+            vRot: (Math.random() - 0.5) * 0.09,
+            isBomb: false,
+            sliced: false
+          });
+        }
+      }
+    }
+
+    // Cek perpotongan segmen garis (x1,y1 -> x2,y2) dengan lingkaran (cx,cy,r)
+    function lineCircleIntersect(x1, y1, x2, y2, cx, cy, r) {
+      const dx = x2 - x1;
+      const dy = y2 - y1;
+      const lenSq = dx * dx + dy * dy;
+      let t = 0;
+      if (lenSq > 0) {
+        t = ((cx - x1) * dx + (cy - y1) * dy) / lenSq;
+        t = Math.max(0, Math.min(1, t));
+      }
+      const closestX = x1 + t * dx;
+      const closestY = y1 + t * dy;
+      const distSq = (cx - closestX) ** 2 + (cy - closestY) ** 2;
+      return distSq <= r * r;
+    }
+
+    function createJuiceSplash(x, y, colors) {
+      for (let i = 0; i < 24; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const speed = 2.5 + Math.random() * 7.5;
+        const color = colors[i % colors.length];
+        particles.push({
+          x, y,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          radius: 4 + Math.random() * 6.5,
+          color,
+          alpha: 1
+        });
+      }
+    }
+
+    function splitFruit(fruit, sliceAngle) {
+      const perpX = -Math.sin(sliceAngle) * 4.0;
+      const perpY = Math.cos(sliceAngle) * 4.0;
+
+      [-1, 1].forEach((side) => {
+        slicedHalves.push({
+          ...fruit,
+          x: fruit.x + perpX * side * 2,
+          y: fruit.y + perpY * side * 2,
+          vx: fruit.vx + perpX * side,
+          vy: fruit.vy - 1.5,
+          vRot: fruit.vRot + side * 0.08,
+          side,
+          alpha: 1
+        });
+      });
+    }
+
+    function addFloatingText(text, x, y, color = '#ffb703', size = 28) {
+      floatingTexts.push({ text, x, y, color, size, alpha: 1, vy: -1.9 });
+    }
+
+    function registerSliceHit(fruit, p1, p2) {
+      fruit.sliced = true;
+
+      if (fruit.isBomb) {
+        handleBombHit(fruit);
+        return true;
+      }
+
+      playSound('slice');
+      const sliceAngle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+      splitFruit(fruit, sliceAngle);
+      createJuiceSplash(fruit.x, fruit.y, [fruit.skinOuter, fruit.fleshOuter, '#ffffff']);
+
+      score += fruit.points;
+      slicedCount++;
+      addFloatingText(`+${fruit.points}`, fruit.x, fruit.y - 15, '#ffffff', 28);
+
+      // Deteksi Combo
+      comboCount++;
+      lastComboPos = { x: fruit.x, y: fruit.y };
+      clearTimeout(comboTimer);
+      comboTimer = setTimeout(() => {
+        if (comboCount >= 3 && gameState === 'PLAYING') {
+          const bonus = comboCount * 10;
+          score += bonus;
+          playSound('combo');
+          addFloatingText(`COMBO x${comboCount}! +${bonus}`, lastComboPos.x, lastComboPos.y - 45, '#00f5d4', 30);
+          updateHUD();
+        }
+        comboCount = 0;
+      }, 240);
+
+      updateHUD();
+      return false;
+    }
+
+    // ==========================================
+    // 5. RENDER BUAH & BOM VEKTOR MURNI (TANPA IKON/EMOJI)
+    // ==========================================
+    function drawColorfulFruit(ctx, f, halfSide = 0) {
+      const r = f.radius;
+      ctx.save();
+      ctx.translate(f.x, f.y);
+      ctx.rotate(f.rotation);
+
+      if (halfSide !== 0) {
+        ctx.beginPath();
+        if (halfSide === -1) {
+          ctx.rect(-r * 1.45, -r * 1.45, r * 1.45, r * 2.9);
+        } else {
+          ctx.rect(0, -r * 1.45, r * 1.45, r * 2.9);
+        }
+        ctx.clip();
+      }
+
+      if (f.isBomb) {
+        // Aura merah bahaya
+        ctx.shadowColor = '#ff0055';
+        ctx.shadowBlur = 24;
+
+        // Badan bom logam gelap mengilap
+        const bombGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+        bombGrad.addColorStop(0, '#5c677d');
+        bombGrad.addColorStop(0.55, '#1e2235');
+        bombGrad.addColorStop(1, '#08090f');
+
+        ctx.fillStyle = bombGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, r, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Garis tepi merah peringatan
+        ctx.shadowBlur = 0;
+        ctx.lineWidth = 4;
+        ctx.strokeStyle = '#ff4d6d';
+        ctx.stroke();
+
+        // Leher dudukan sumbu di atas bola bom
+        ctx.fillStyle = '#334155';
+        ctx.fillRect(-10, -r - 6, 20, 10);
+
+        // Sumbu melengkung & percikan api
+        ctx.strokeStyle = '#ffd166';
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        ctx.moveTo(0, -r - 6);
+        ctx.quadraticCurveTo(14, -r - 22, 26, -r - 14);
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffbe0b';
+        ctx.shadowColor = '#ffbe0b';
+        ctx.shadowBlur = 12;
+        ctx.beginPath();
+        ctx.arc(26, -r - 14, 7.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Simbol silang peringatan geometris di tengah bom
+        ctx.shadowBlur = 0;
+        ctx.strokeStyle = '#ff4d6d';
+        ctx.lineWidth = 6;
+        ctx.lineCap = 'round';
+        const crossSize = r * 0.34;
+        ctx.beginPath();
+        ctx.moveTo(-crossSize, -crossSize);
+        ctx.lineTo(crossSize, crossSize);
+        ctx.moveTo(crossSize, -crossSize);
+        ctx.lineTo(-crossSize, crossSize);
+        ctx.stroke();
+
+        // Kilap logam
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.28)';
+        ctx.beginPath();
+        ctx.ellipse(-r * 0.35, -r * 0.35, r * 0.22, r * 0.12, -Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.restore();
+        return;
+      }
+
+      // Aura cahaya warna-warni di sekeliling buah
+      ctx.shadowColor = f.skinOuter;
+      ctx.shadowBlur = 22;
+
+      // 1. Kulit Luar Buah (Gradasi Cerah)
+      const skinGrad = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+      skinGrad.addColorStop(0, f.skinOuter);
+      skinGrad.addColorStop(1, f.skinInner);
+
+      ctx.fillStyle = skinGrad;
+      ctx.beginPath();
+      ctx.arc(0, 0, r, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.shadowBlur = 0;
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.55)';
+      ctx.stroke();
+
+      // 2. Motif Loreng Semangka
+      if (f.name === 'Semangka' && halfSide === 0) {
+        ctx.strokeStyle = '#004b23';
+        ctx.lineWidth = 6.5;
+        for (let s = -1; s <= 1; s++) {
+          ctx.beginPath();
+          ctx.arc(s * r * 0.38, 0, r * 0.72, -Math.PI * 0.38, Math.PI * 0.38);
+          ctx.stroke();
+        }
+      }
+
+      // 3. Daging Buah Bagian Dalam
+      if (halfSide !== 0 || f.showFleshWhole) {
+        const fleshR = r * 0.82;
+        const fleshGrad = ctx.createRadialGradient(0, 0, fleshR * 0.1, 0, 0, fleshR);
+        fleshGrad.addColorStop(0, f.fleshInner);
+        fleshGrad.addColorStop(1, f.fleshOuter);
+
+        ctx.fillStyle = fleshGrad;
+        ctx.beginPath();
+        ctx.arc(0, 0, fleshR, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = f.seedColor;
+        const seedCount = 8;
+        for (let k = 0; k < seedCount; k++) {
+          const ang = (k * Math.PI * 2) / seedCount;
+          const sx = Math.cos(ang) * (fleshR * 0.56);
+          const sy = Math.sin(ang) * (fleshR * 0.56);
+          ctx.beginPath();
+          ctx.ellipse(sx, sy, 4.8, 2.6, ang, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+
+      // 4. Daun Hijau Segar
+      if (f.hasLeaf && halfSide === 0) {
+        ctx.fillStyle = '#38b000';
+        ctx.beginPath();
+        ctx.ellipse(8, -r + 2, 17, 8.5, -0.45, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#9ef01a';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      // 5. Kilap 3D (Glossy Specular Highlight)
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+      ctx.beginPath();
+      ctx.ellipse(-r * 0.34, -r * 0.34, r * 0.26, r * 0.14, -Math.PI / 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
+    }
+
+    // ==========================================
+    // 6. RENDER LOOP UTAMA
+    // ==========================================
     function render() {
       const now = performance.now();
 
-      // Gambar video (mirror)
+      // Hitung FPS
+      frameCount++;
+      if (now - lastFpsUpdate >= 500) {
+        const fps = Math.round((frameCount * 1000) / (now - lastFpsUpdate));
+        fpsDisplay.innerText = `FPS: ${fps}`;
+        frameCount = 0;
+        lastFpsUpdate = now;
+      }
+
+      canvasCtx.save();
+
+      // Efek Screen Shake saat bom meledak
+      if (screenShake > 0) {
+        const sx = (Math.random() - 0.5) * screenShake;
+        const sy = (Math.random() - 0.5) * screenShake;
+        canvasCtx.translate(sx, sy);
+        screenShake *= 0.88;
+        if (screenShake < 0.5) screenShake = 0;
+      }
+
+      // 1. Gambar Video Webcam (Mirror) + Vignette Gelap Ringan
       canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
       canvasCtx.save();
       canvasCtx.scale(-1, 1);
@@ -78,44 +1168,218 @@
       canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
       canvasCtx.restore();
 
-      // Buang titik yang sudah kedaluwarsa
+      canvasCtx.fillStyle = 'rgba(8, 12, 24, 0.30)';
+      canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+
+      // 2. Update & Cek Collision Jejak Tebasan
       sliceTrail = sliceTrail.filter(p => now - p.t < TRAIL_LIFETIME);
 
+      if (gameState === 'PLAYING') {
+        const spawnInterval = Math.max(1150, 2100 - score * 1.5);
+        if (now - lastSpawnTime > spawnInterval) {
+          spawnWave();
+          lastSpawnTime = now;
+        }
+
+        let bombTriggered = false;
+        for (let i = 1; i < sliceTrail.length && !bombTriggered; i++) {
+          const p = sliceTrail[i];
+          if (p.start) continue;
+          const prev = sliceTrail[i - 1];
+
+          const dt = Math.max(1, p.t - prev.t);
+          const dist = Math.hypot(p.x - prev.x, p.y - prev.y);
+          const speed = dist / dt;
+
+          if (speed >= MIN_SLICE_SPEED && (now - p.t) < 180) {
+            for (const fruit of fruits) {
+              if (!fruit.sliced && lineCircleIntersect(prev.x, prev.y, p.x, p.y, fruit.x, fruit.y, fruit.radius + 10)) {
+                bombTriggered = registerSliceHit(fruit, prev, p);
+                if (bombTriggered) break;
+              }
+            }
+          }
+        }
+      }
+
+      // 3. Update & Gambar Buah Aktif (Hanya bergerak jika status PLAYING)
+      const gravity = 0.25;
+      for (let i = fruits.length - 1; i >= 0; i--) {
+        const f = fruits[i];
+
+        if (gameState === 'PLAYING') {
+          f.x += f.vx;
+          f.y += f.vy;
+          f.vy += gravity;
+          f.rotation += f.vRot;
+        }
+
+        if (f.sliced) {
+          fruits.splice(i, 1);
+          continue;
+        }
+
+        // Buah jatuh keluar batas bawah layar
+        if (f.y > canvasElement.height + 85 && f.vy > 0) {
+          if (!f.isBomb && gameState === 'PLAYING') {
+            lives--;
+            updateHUD();
+            addFloatingText('Terlewat!', Math.min(Math.max(f.x, 90), canvasElement.width - 90), canvasElement.height - 40, '#ff4d6d', 24);
+            if (lives <= 0) {
+              endGame('Nyawa Habis!');
+            }
+          }
+          fruits.splice(i, 1);
+          continue;
+        }
+
+        drawColorfulFruit(canvasCtx, f, 0);
+      }
+
+      // 4. Update & Gambar Belahan Buah Terpotong
+      for (let i = slicedHalves.length - 1; i >= 0; i--) {
+        const h = slicedHalves[i];
+        h.x += h.vx;
+        h.y += h.vy;
+        h.vy += gravity * 1.1;
+        h.rotation += h.vRot;
+        h.alpha -= 0.016;
+
+        if (h.alpha <= 0 || h.y > canvasElement.height + 95) {
+          slicedHalves.splice(i, 1);
+          continue;
+        }
+
+        canvasCtx.save();
+        canvasCtx.globalAlpha = Math.max(0, h.alpha);
+        drawColorfulFruit(canvasCtx, h, h.side);
+        canvasCtx.restore();
+      }
+
+      // 5. Update & Gambar Partikel Percikan Jus
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const pt = particles[i];
+        pt.x += pt.vx;
+        pt.y += pt.vy;
+        pt.vy += 0.16;
+        pt.alpha -= 0.022;
+
+        if (pt.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+
+        canvasCtx.save();
+        canvasCtx.globalAlpha = pt.alpha;
+        canvasCtx.fillStyle = pt.color;
+        canvasCtx.shadowColor = pt.color;
+        canvasCtx.shadowBlur = 8;
+        canvasCtx.beginPath();
+        canvasCtx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2);
+        canvasCtx.fill();
+        canvasCtx.restore();
+      }
+
+      // 6. Gambar Jejak Tebasan (Tebal, Bercahaya & Anti-Hilang Saat Cepat)
       drawSliceTrail(now);
+
+      // 7. Gambar Teks Skor & Combo Melayang
+      for (let i = floatingTexts.length - 1; i >= 0; i--) {
+        const ft = floatingTexts[i];
+        ft.y += ft.vy;
+        ft.alpha -= 0.018;
+        if (ft.alpha <= 0) {
+          floatingTexts.splice(i, 1);
+          continue;
+        }
+
+        canvasCtx.save();
+        canvasCtx.globalAlpha = ft.alpha;
+        canvasCtx.font = `700 ${ft.size}px 'Fredoka', sans-serif`;
+        canvasCtx.textAlign = 'center';
+        canvasCtx.fillStyle = ft.color;
+        canvasCtx.shadowColor = 'rgba(0,0,0,0.85)';
+        canvasCtx.shadowBlur = 8;
+        canvasCtx.fillText(ft.text, ft.x, ft.y);
+        canvasCtx.restore();
+      }
+
+      // 8. Kilatan Ledakan Bom
+      if (flashAlpha > 0) {
+        canvasCtx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+        canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+        flashAlpha -= 0.05;
+      }
+
+      canvasCtx.restore();
       requestAnimationFrame(render);
     }
 
-    // Gambar jejak: meruncing & memudar sesuai umur titik
     function drawSliceTrail(now) {
-      if (sliceTrail.length < 2) return;
+      if (sliceTrail.length === 0) return;
 
       canvasCtx.save();
       canvasCtx.lineCap = 'round';
       canvasCtx.lineJoin = 'round';
-      canvasCtx.strokeStyle = '#00ffff';
-      canvasCtx.shadowColor = '#00ffff';
-      canvasCtx.shadowBlur = 10;
 
-      for (let i = 1; i < sliceTrail.length; i++) {
-        const p = sliceTrail[i];
-        if (p.start) continue; // jangan sambungkan stroke berbeda
+      if (sliceTrail.length >= 2) {
+        for (let i = 1; i < sliceTrail.length; i++) {
+          const p = sliceTrail[i];
+          if (p.start) continue;
 
-        const prev = sliceTrail[i - 1];
-        const life = 1 - (now - p.t) / TRAIL_LIFETIME; // 1 = baru, 0 = hilang
+          const prev = sliceTrail[i - 1];
+          const next = (i + 1 < sliceTrail.length && !sliceTrail[i + 1].start) ? sliceTrail[i + 1] : p;
+          const life = Math.max(0.12, 1 - (now - p.t) / TRAIL_LIFETIME);
 
-        canvasCtx.globalAlpha = Math.max(life, 0);
-        canvasCtx.lineWidth = 2 + 8 * life;
+          const midX = (p.x + next.x) / 2;
+          const midY = (p.y + next.y) / 2;
+          const prevMidX = (i > 1 && !prev.start) ? (sliceTrail[i - 2].x + prev.x) / 2 : prev.x;
+          const prevMidY = (i > 1 && !prev.start) ? (sliceTrail[i - 2].y + prev.y) / 2 : prev.y;
 
+          // Aura Luar Neon Cyan-Biru Lebar
+          canvasCtx.globalAlpha = life * 0.9;
+          canvasCtx.strokeStyle = '#00f5d4';
+          canvasCtx.shadowColor = '#00bbf9';
+          canvasCtx.shadowBlur = 18;
+          canvasCtx.lineWidth = 7 + 15 * life;
+
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(prevMidX, prevMidY);
+          canvasCtx.quadraticCurveTo(p.x, p.y, midX, midY);
+          canvasCtx.stroke();
+
+          // Inti Bilah Putih Terang
+          canvasCtx.globalAlpha = Math.min(1, life * 1.1);
+          canvasCtx.strokeStyle = '#ffffff';
+          canvasCtx.shadowColor = '#ffffff';
+          canvasCtx.shadowBlur = 6;
+          canvasCtx.lineWidth = 3 + 6 * life;
+
+          canvasCtx.beginPath();
+          canvasCtx.moveTo(prevMidX, prevMidY);
+          canvasCtx.quadraticCurveTo(p.x, p.y, midX, midY);
+          canvasCtx.stroke();
+        }
+      }
+
+      // Titik cahaya di ujung jari telunjuk saat ini
+      const tip = sliceTrail[sliceTrail.length - 1];
+      if (now - tip.t < 200) {
+        canvasCtx.globalAlpha = 1;
+        canvasCtx.fillStyle = '#ffffff';
+        canvasCtx.shadowColor = '#00f5d4';
+        canvasCtx.shadowBlur = 18;
         canvasCtx.beginPath();
-        canvasCtx.moveTo(prev.x, prev.y);
-        canvasCtx.lineTo(p.x, p.y);
-        canvasCtx.stroke();
+        canvasCtx.arc(tip.x, tip.y, 9, 0, Math.PI * 2);
+        canvasCtx.fill();
       }
 
       canvasCtx.restore();
     }
 
-    // Jalankan kamera
+    // ==========================================
+    // 7. JALANKAN KAMERA WEBCAM
+    // ==========================================
     const camera = new Camera(videoElement, {
       onFrame: async () => {
         await hands.send({ image: videoElement });
@@ -125,9 +1389,13 @@
     });
 
     camera.start()
-      .then(() => requestAnimationFrame(render))
+      .then(() => {
+        requestAnimationFrame(render);
+      })
       .catch(err => {
-        statusText.innerText = "Error Kamera: " + err.message + " (Pastikan izin webcam diberikan)";
+        statusDot.className = 'dot error';
+        statusText.innerText = 'Error Kamera: ' + err.message + ' (Pastikan izin webcam aktif)';
+        startBtn.innerText = 'Kamera Tidak Terdeteksi';
       });
   </script>
 </body>
