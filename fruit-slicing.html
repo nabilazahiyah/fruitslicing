@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fruit Slicing - Viskom Hand Tracking</title>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --senga:#B30008; --mandarin:#F57D44; --daisy:#FEE08E; --vanilla:#FFF8E0; --kiwi:#C1D653; --tropicana:#769F13;
+  --ink:#4a2a1a; --ink-soft:#7a4a2e;
+  --wood-light:#dca766; --wood-mid:#c98f52; --wood-dark:#8a5530;
+}
+*{box-sizing:border-box;margin:0;padding:0;user-select:none}
+body{
+  min-height:100vh;color:var(--ink);font-family:'Plus Jakarta Sans',sans-serif;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 16px;overflow-x:hidden;
+  background-color:var(--wood-mid);
+  background-image:
+    repeating-linear-gradient(90deg,transparent 0 236px,rgba(70,38,15,.38) 236px 239px,rgba(255,230,180,.25) 239px 241px),
+    repeating-linear-gradient(90deg,rgba(90,50,20,.07) 0 2px,transparent 2px 9px,rgba(255,235,190,.10) 9px 11px,transparent 11px 26px),
+    repeating-linear-gradient(88deg,rgba(120,70,30,.12) 0 1px,transparent 1px 5px),
+    linear-gradient(180deg,var(--wood-light) 0%,var(--wood-mid) 50%,#d49a5c 100%);
+  background-attachment:fixed;
+}
+header{
+  text-align:center;margin-bottom:12px;background:var(--vanilla);border:3px solid var(--daisy);border-radius:18px;
+  padding:8px 28px 10px;box-shadow:0 6px 0 rgba(90,50,20,.35),0 12px 24px rgba(60,30,10,.25);
+}
+header h1{
+  font-family:'Fredoka',sans-serif;font-size:2.1rem;letter-spacing:1px;
+  background:linear-gradient(90deg,var(--senga) 0%,#d9381a 45%,var(--mandarin) 100%);
+  -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;
+}
+header p{font-size:.88rem;color:var(--ink-soft);margin-top:2px}
+
+.game-wrapper{
+  position:relative;width:96vw;max-width:1160px;background:var(--vanilla);border:10px solid var(--wood-dark);
+  border-radius:28px;padding:14px 16px;display:flex;flex-direction:column;
+  box-shadow:inset 0 0 0 3px var(--daisy),0 8px 0 rgba(70,38,15,.45),0 28px 50px rgba(50,25,8,.45);
+}
+.game-wrapper:fullscreen{width:100vw;height:100vh;max-width:none;border-radius:0;border-width:0;box-shadow:none;padding:12px 24px;justify-content:space-between}
+
+.hud-bar{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:12px;padding:10px 18px;
+  background:var(--vanilla);border:2px solid var(--daisy);border-radius:18px;box-shadow:0 3px 0 rgba(138,85,48,.25);flex-wrap:wrap;
+}
+.hud-group{display:flex;align-items:center;gap:24px}
+.stat-box{display:flex;flex-direction:column}
+.stat-label{font-size:.72rem;text-transform:uppercase;letter-spacing:1px;color:var(--ink-soft);font-weight:700}
+.stat-value{font-family:'Fredoka',sans-serif;font-size:1.65rem;font-weight:700;color:var(--senga);line-height:1.1}
+.stat-value.best{color:var(--tropicana);font-size:1.35rem}
+
+.lives-wrapper{display:flex;flex-direction:column;align-items:center;gap:6px}
+.lives-pips{display:flex;align-items:center;gap:8px}
+.life-pip{width:34px;height:12px;border-radius:999px;background:#f1dfc0;border:1px solid #e0c58f;transition:all .25s ease}
+.life-pip.active{background:linear-gradient(90deg,var(--senga),#d9333b);border-color:#e8737a;box-shadow:0 3px 10px rgba(179,0,8,.35)}
+
+.hud-controls{display:flex;align-items:center;gap:10px}
+.badge-fps{background:rgba(193,214,83,.35);color:#4a6b0a;border:1px solid var(--kiwi);padding:7px 12px;border-radius:999px;font-size:.8rem;font-weight:700;font-variant-numeric:tabular-nums}
+.btn-hud{
+  background:var(--vanilla);border:2px solid var(--daisy);color:var(--ink);height:36px;padding:0 14px;border-radius:999px;cursor:pointer;
+  font-family:'Plus Jakarta Sans',sans-serif;font-size:.8rem;font-weight:600;box-shadow:0 2px 0 rgba(138,85,48,.25);transition:all .2s;
+}
+.btn-hud:hover{background:var(--daisy);border-color:var(--mandarin);color:var(--senga);transform:translateY(-1px)}
+
+#canvas-container{
+  position:relative;width:100%;aspect-ratio:4/3;max-height:76vh;margin:0 auto;overflow:hidden;
+  border:5px solid var(--tropicana);outline:3px solid var(--daisy);border-radius:20px;background:#3a2a1a;box-shadow:0 10px 24px rgba(70,38,15,.3);
+}
+.game-wrapper:fullscreen #canvas-container{max-height:calc(100vh - 125px);width:auto}
+canvas{width:100%;height:100%;display:block}
+video{display:none}
+
+.overlay{
+  position:absolute;inset:0;background:rgba(255,248,224,.93);backdrop-filter:blur(8px);color:var(--ink);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:28px;z-index:10;transition:opacity .25s ease;
+}
+.overlay.hidden{opacity:0;pointer-events:none}
+.overlay-badge{background:var(--daisy);color:#8a3a0c;border:1px solid var(--mandarin);padding:5px 16px;border-radius:999px;font-size:.78rem;font-weight:700;margin-bottom:12px;letter-spacing:.8px}
+.overlay h2{font-family:'Fredoka',sans-serif;font-size:2.5rem;margin-bottom:10px;color:var(--senga)}
+.overlay p{max-width:480px;color:var(--ink-soft);font-size:.96rem;line-height:1.5;margin-bottom:22px}
+
+.tips-grid{display:flex;gap:12px;margin-bottom:24px;flex-wrap:wrap;justify-content:center}
+.tip-card{background:#fff;border:1px solid var(--daisy);border-bottom:3px solid var(--kiwi);padding:9px 16px;border-radius:10px;font-size:.85rem;font-weight:600;color:var(--ink)}
+
+.btn-group{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.btn-primary,.btn-secondary{font-family:'Fredoka',sans-serif;font-size:1.15rem;font-weight:600;padding:13px 32px;border-radius:999px;cursor:pointer;transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+.btn-primary{border:none;background:linear-gradient(180deg,#86b01a,var(--tropicana));color:#fff;box-shadow:0 5px 0 #55780c,0 10px 20px rgba(118,159,19,.35)}
+.btn-primary:hover:not(:disabled){transform:translateY(-2px) scale(1.03);box-shadow:0 7px 0 #55780c,0 14px 26px rgba(118,159,19,.45)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed}
+.btn-secondary{background:linear-gradient(180deg,var(--vanilla),var(--daisy));border:2px solid var(--mandarin);color:#b3410f;box-shadow:0 4px 0 rgba(245,125,68,.45)}
+.btn-secondary:hover{background:var(--daisy);transform:translateY(-2px) scale(1.03)}
+
+.final-stats{display:flex;gap:28px;margin-bottom:24px;background:rgba(254,224,142,.45);padding:14px 28px;border-radius:18px;border:1px solid var(--daisy)}
+.bomb-lives-box{display:flex;flex-direction:column;align-items:center;gap:10px;margin-bottom:24px;background:rgba(179,0,8,.07);border:1px solid rgba(179,0,8,.35);padding:14px 28px;border-radius:14px}
+.bomb-lives-box span{font-size:.82rem;font-weight:700;letter-spacing:.5px;color:var(--senga);text-transform:uppercase}
+
+.status-bar{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:0 4px;font-size:.84rem;color:var(--ink-soft)}
+.status-indicator{display:flex;align-items:center;gap:8px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--mandarin);box-shadow:0 0 8px var(--mandarin)}
+.dot.active{background:var(--tropicana);box-shadow:0 0 8px var(--tropicana)}
+.dot.error{background:var(--senga);box-shadow:0 0 8px var(--senga)}
+
+@media (max-width:700px){
+  body{padding:16px 10px}
+  header{padding:6px 16px 8px}
+  header h1{font-size:1.7rem}
+  .game-wrapper{width:100%;padding:10px;border-width:7px;border-radius:22px}
+  .hud-bar{justify-content:center;padding:12px}
+  .hud-group{gap:18px}
+  .hud-controls{flex-wrap:wrap;justify-content:center}
+  .status-bar{gap:8px;flex-wrap:wrap}
+  .overlay{padding:16px}
+  .overlay h2{font-size:1.9rem}
+  .overlay p{font-size:.86rem}
+  .tip-card{font-size:.78rem}
+}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils@0.3.1675466862/camera_utils.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+<header>
+  <h1>FRUIT SLICING ARENA</h1>
+  <p>Kendali Gestur Tangan Real-Time • MediaPipe Computer Vision</p>
+</header>
+
+<div class="game-wrapper" id="game-wrapper">
+  <div class="hud-bar">
+    <div class="hud-group">
+      <div class="stat-box"><span class="stat-label">Skor</span><span class="stat-value" id="score-display">0</span></div>
+      <div class="stat-box"><span class="stat-label">Terbaik</span><span class="stat-value best" id="highscore-display">0</span></div>
+    </div>
+    <div class="lives-wrapper" title="Sisa Nyawa">
+      <span class="stat-label">Nyawa (<span id="lives-count-text">3</span>/3)</span>
+      <div class="lives-pips" id="lives-display">
+        <div class="life-pip active"></div><div class="life-pip active"></div><div class="life-pip active"></div>
+      </div>
+    </div>
+    <div class="hud-controls">
+      <span class="badge-fps" id="fps-display">FPS: --</span>
+      <button class="btn-hud" id="sound-toggle">Suara: ON</button>
+      <button class="btn-hud" id="fullscreen-toggle">Layar Penuh</button>
+    </div>
+  </div>
+
+  <div id="canvas-container">
+    <video id="webcam" autoplay playsinline></video>
+    <canvas id="output_canvas" width="960" height="720"></canvas>
+
+    <div class="overlay" id="start-overlay">
+      <span class="overlay-badge">HAND TRACKING READY</span>
+      <h2>Siap Menebas Buah?</h2>
+      <p>Arahkan <strong>jari telunjuk</strong> ke depan kamera dan ayunkan dengan cepat untuk memotong buah-buah besar yang melayang.</p>
+      <div class="tips-grid">
+        <div class="tip-card">Tebas Buah = +10~20 Poin</div>
+        <div class="tip-card">3+ Buah Sekaligus = Combo</div>
+        <div class="tip-card">Kena Bom = -1 Nyawa</div>
+      </div>
+      <button class="btn-primary" id="start-btn" disabled>Menunggu Kamera...</button>
+    </div>
+
+    <div class="overlay hidden" id="bomb-overlay">
+      <span class="overlay-badge" style="color:#B30008;border-color:rgba(179,0,8,.45);background:rgba(179,0,8,.1)">PERINGATAN LEDAKAN</span>
+      <h2>Terkena Bom!</h2>
+      <p>Kamu terkena bom dan kehilangan <strong>1 nyawa</strong>. Pilih lanjutkan dengan sisa nyawa saat ini atau ulang dari awal.</p>
+      <div class="bomb-lives-box">
+        <span id="bomb-lives-label">Sisa Nyawa: 2 / 3</span>
+        <div class="lives-pips" id="bomb-lives-display">
+          <div class="life-pip active"></div><div class="life-pip active"></div><div class="life-pip"></div>
+        </div>
+      </div>
+      <div class="btn-group">
+        <button class="btn-primary" id="continue-btn">Lanjutkan (Sisa Nyawa)</button>
+        <button class="btn-secondary" id="bomb-restart-btn">Ulang dari Awal</button>
+      </div>
+    </div>
+
+    <div class="overlay hidden" id="gameover-overlay">
+      <span class="overlay-badge" style="color:#B30008;border-color:rgba(179,0,8,.4);background:rgba(179,0,8,.1)">PERMAINAN SELESAI</span>
+      <h2 id="gameover-title">Game Over!</h2>
+      <div class="final-stats">
+        <div class="stat-box" style="align-items:center"><span class="stat-label">Skor Akhir</span><span class="stat-value" id="final-score">0</span></div>
+        <div class="stat-box" style="align-items:center"><span class="stat-label">Buah Terpotong</span><span class="stat-value best" id="final-sliced">0</span></div>
+      </div>
+      <button class="btn-primary" id="restart-btn">Ulang dari Awal</button>
+    </div>
+  </div>
+
+  <div class="status-bar">
+    <div class="status-indicator"><span class="dot" id="status-dot"></span><span id="status">Status: Meminta akses kamera...</span></div>
+    <span>Tip: Klik tombol Layar Penuh di kanan atas untuk memperluas tampilan</span>
+  </div>
+</div>
+
+<script>
+// 1. ELEMEN & KONFIGURASI
+const $ = (id) => document.getElementById(id);
+const gameWrapper = $('game-wrapper'), videoElement = $('webcam'), canvasElement = $('output_canvas');
+const canvasCtx = canvasElement.getContext('2d');
+const statusText = $('status'), statusDot = $('status-dot');
+const scoreDisplay = $('score-display'), highscoreDisplay = $('highscore-display');
+const livesDisplay = $('lives-display'), livesCountText = $('lives-count-text'), fpsDisplay = $('fps-display');
+const startOverlay = $('start-overlay'), bombOverlay = $('bomb-overlay'), gameoverOverlay = $('gameover-overlay');
+const bombLivesLabel = $('bomb-lives-label'), bombLivesDisplay = $('bomb-lives-display');
+const gameoverTitle = $('gameover-title'), finalScoreEl = $('final-score'), finalSlicedEl = $('final-sliced');
+const startBtn = $('start-btn'), continueBtn = $('continue-btn'), bombRestartBtn = $('bomb-restart-btn'), restartBtn = $('restart-btn');
+const soundToggleBtn = $('sound-toggle'), fullscreenToggleBtn = $('fullscreen-toggle');
+
+let sliceTrail = [];
+const TRAIL_LIFETIME = 420, STROKE_GAP = 480, MIN_SLICE_SPEED = 0.14;
+
+let gameState = 'MENU';   // MENU | PLAYING | BOMB_HIT | GAMEOVER
+let cameraReady = false, score = 0, lives = 3, slicedCount = 0, soundEnabled = true;
+let highScore = parseInt(localStorage.getItem('fruitSliceHighScore') || '0', 10);
+highscoreDisplay.innerText = highScore;
+
+let fruits = [], slicedHalves = [], particles = [], floatingTexts = [];
+let lastSpawnTime = 0, screenShake = 0, flashAlpha = 0;
+let comboCount = 0, comboTimer = null, lastComboPos = { x: 480, y: 360 };
+let frameCount = 0, lastFpsUpdate = performance.now();
+
+// Warna buah mengikuti palet: Senga Sengana, Mandarin, Daisy Desi, Kiwi Golada, Tropicana
+const FRUIT_TYPES = [
+  { name:'Semangka', radius:66, skinOuter:'#769F13', skinInner:'#3f5d08', fleshOuter:'#ff2e63', fleshInner:'#ff758f', seedColor:'#1e272e', hasLeaf:false, showFleshWhole:false, points:10 },
+  { name:'Jeruk', radius:58, skinOuter:'#F57D44', skinInner:'#d9561a', fleshOuter:'#ffa94d', fleshInner:'#FFF8E0', seedColor:'#ffffff', hasLeaf:true, showFleshWhole:false, points:10 },
+  { name:'Buah Naga', radius:62, skinOuter:'#ff007f', skinInner:'#b5179e', fleshOuter:'#ffffff', fleshInner:'#f8edeb', seedColor:'#111111', hasLeaf:true, showFleshWhole:false, points:20 },
+  { name:'Lemon', radius:56, skinOuter:'#FEE08E', skinInner:'#f2b632', fleshOuter:'#f7e26b', fleshInner:'#FFF8E0', seedColor:'#ffffff', hasLeaf:true, showFleshWhole:false, points:15 },
+  { name:'Apel Merah', radius:58, skinOuter:'#e0242e', skinInner:'#B30008', fleshOuter:'#ffe5ec', fleshInner:'#fff0f3', seedColor:'#5c2c06', hasLeaf:true, showFleshWhole:false, points:15 },
+  { name:'Kiwi', radius:56, skinOuter:'#C1D653', skinInner:'#769F13', fleshOuter:'#C1D653', fleshInner:'#fffffc', seedColor:'#1b4332', hasLeaf:false, showFleshWhole:true, points:15 }
+];
+
+// 2. SUARA & HUD
+const AudioCtx = window.AudioContext || window.webkitAudioContext;
+let audioCtx = null;
+function initAudio() {
+  if (!audioCtx) audioCtx = new AudioCtx();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+}
+function playSound(type) {
+  if (!soundEnabled) return;
+  initAudio();
+  const now = audioCtx.currentTime;
+  const osc = audioCtx.createOscillator(), gain = audioCtx.createGain();
+  osc.connect(gain); gain.connect(audioCtx.destination);
+  if (type === 'slice') {
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(540, now);
+    osc.frequency.exponentialRampToValueAtTime(150, now + 0.14);
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
+    osc.start(now); osc.stop(now + 0.14);
+  } else if (type === 'combo') {
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(587.33, now);
+    osc.frequency.setValueAtTime(880, now + 0.08);
+    gain.gain.setValueAtTime(0.25, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.28);
+    osc.start(now); osc.stop(now + 0.28);
+  } else if (type === 'bomb') {
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(130, now);
+    osc.frequency.exponentialRampToValueAtTime(30, now + 0.55);
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.55);
+    osc.start(now); osc.stop(now + 0.55);
+  }
+}
+soundToggleBtn.addEventListener('click', () => {
+  soundEnabled = !soundEnabled;
+  soundToggleBtn.innerText = soundEnabled ? 'Suara: ON' : 'Suara: OFF';
+});
+fullscreenToggleBtn.addEventListener('click', () => {
+  if (!document.fullscreenElement) gameWrapper.requestFullscreen().catch(() => {});
+  else document.exitFullscreen().catch(() => {});
+});
+document.addEventListener('fullscreenchange', () => {
+  fullscreenToggleBtn.innerText = document.fullscreenElement ? 'Keluar Layar Penuh' : 'Layar Penuh';
+});
+
+// 3. MEDIAPIPE HANDS
+const hands = new Hands({ locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}` });
+hands.setOptions({ maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.45, minTrackingConfidence: 0.45 });
+hands.onResults(onResults);
+
+function onResults(results) {
+  if (!cameraReady) {
+    cameraReady = true;
+    statusDot.className = 'dot active';
+    statusText.innerText = 'Status: Hand Tracking Aktif! Arahkan jari telunjuk.';
+    startBtn.disabled = false;
+    startBtn.innerText = 'Mulai Bermain';
+  }
+  if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+    const tip = results.multiHandLandmarks[0][8];
+    const now = performance.now();
+    const x = (1 - tip.x) * canvasElement.width;
+    const y = tip.y * canvasElement.height;
+    const last = sliceTrail[sliceTrail.length - 1];
+    sliceTrail.push({ x, y, t: now, start: !last || (now - last.t) > STROKE_GAP });
+  }
+}
+
+// 4. LOGIKA GAME
+function renderLifePips(container, currentLives) {
+  const safe = Math.max(0, currentLives);
+  let html = '';
+  for (let i = 0; i < 3; i++) html += `<div class="life-pip ${i < safe ? 'active' : ''}"></div>`;
+  container.innerHTML = html;
+}
+
+function startGame() {
+  initAudio();
+  score = 0; lives = 3; slicedCount = 0; comboCount = 0;
+  clearTimeout(comboTimer);
+  fruits = []; slicedHalves = []; particles = []; floatingTexts = []; sliceTrail = [];
+  screenShake = 0; flashAlpha = 0;
+  lastSpawnTime = performance.now();
+  updateHUD();
+  gameState = 'PLAYING';
+  startOverlay.classList.add('hidden');
+  bombOverlay.classList.add('hidden');
+  gameoverOverlay.classList.add('hidden');
+}
+
+function resumeGame() {
+  initAudio();
+  fruits = []; sliceTrail = []; comboCount = 0;
+  clearTimeout(comboTimer);
+  lastSpawnTime = performance.now();
+  gameState = 'PLAYING';
+  bombOverlay.classList.add('hidden');
+}
+
+function handleBombHit(bomb) {
+  playSound('bomb');
+  screenShake = 26;
+  flashAlpha = 0.85;
+  createJuiceSplash(bomb.x, bomb.y, ['#B30008', '#FEE08E', '#ffffff']);
+  lives--;
+  updateHUD();
+  clearTimeout(comboTimer);
+  comboCount = 0;
+  if (lives <= 0) {
+    endGame('Kehabisan Nyawa!');
+  } else {
+    gameState = 'BOMB_HIT';
+    bombLivesLabel.innerText = `Sisa Nyawa: ${lives} / 3`;
+    renderLifePips(bombLivesDisplay, lives);
+    bombOverlay.classList.remove('hidden');
+  }
+}
+
+function endGame(reason = 'Game Over!') {
+  gameState = 'GAMEOVER';
+  gameoverTitle.innerText = reason;
+  finalScoreEl.innerText = score;
+  finalSlicedEl.innerText = slicedCount;
+  if (score > highScore) {
+    highScore = score;
+    localStorage.setItem('fruitSliceHighScore', highScore);
+    highscoreDisplay.innerText = highScore;
+  }
+  bombOverlay.classList.add('hidden');
+  gameoverOverlay.classList.remove('hidden');
+}
+
+function updateHUD() {
+  scoreDisplay.innerText = score;
+  livesCountText.innerText = Math.max(0, lives);
+  renderLifePips(livesDisplay, lives);
+}
+
+startBtn.addEventListener('click', startGame);
+continueBtn.addEventListener('click', resumeGame);
+bombRestartBtn.addEventListener('click', startGame);
+restartBtn.addEventListener('click', startGame);
+
+function spawnWave() {
+  const difficulty = Math.min(4, 1 + Math.floor(score / 120));
+  const count = Math.floor(Math.random() * difficulty) + 1;
+  for (let i = 0; i < count; i++) {
+    const isBomb = score >= 20 && Math.random() < 0.22;
+    const margin = 135;
+    const x = margin + Math.random() * (canvasElement.width - margin * 2);
+    const y = canvasElement.height + 65;
+    const vx = (canvasElement.width / 2 - x) * 0.008 + (Math.random() - 0.5) * 3.2;
+    const vy = -(15.2 + Math.random() * 3.8);
+    if (isBomb) {
+      fruits.push({ x, y, vx, vy, radius: 48, rotation: 0, vRot: (Math.random() - 0.5) * 0.12, isBomb: true, sliced: false });
+    } else {
+      const type = FRUIT_TYPES[Math.floor(Math.random() * FRUIT_TYPES.length)];
+      fruits.push({ ...type, x, y, vx, vy, rotation: Math.random() * Math.PI * 2, vRot: (Math.random() - 0.5) * 0.09, isBomb: false, sliced: false });
+    }
+  }
+}
+
+function lineCircleIntersect(x1, y1, x2, y2, cx, cy, r) {
+  const dx = x2 - x1, dy = y2 - y1, lenSq = dx * dx + dy * dy;
+  let t = 0;
+  if (lenSq > 0) t = Math.max(0, Math.min(1, ((cx - x1) * dx + (cy - y1) * dy) / lenSq));
+  const px = x1 + t * dx, py = y1 + t * dy;
+  return (cx - px) ** 2 + (cy - py) ** 2 <= r * r;
+}
+
+function createJuiceSplash(x, y, colors) {
+  for (let i = 0; i < 24; i++) {
+    const angle = Math.random() * Math.PI * 2;
+    const speed = 2.5 + Math.random() * 7.5;
+    particles.push({ x, y, vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, radius: 4 + Math.random() * 6.5, color: colors[i % colors.length], alpha: 1 });
+  }
+}
+
+function splitFruit(fruit, sliceAngle) {
+  const perpX = -Math.sin(sliceAngle) * 4.0;
+  const perpY = Math.cos(sliceAngle) * 4.0;
+  [-1, 1].forEach((side) => {
+    slicedHalves.push({ ...fruit, x: fruit.x + perpX * side * 2, y: fruit.y + perpY * side * 2, vx: fruit.vx + perpX * side, vy: fruit.vy - 1.5, vRot: fruit.vRot + side * 0.08, side, alpha: 1 });
+  });
+}
+
+function addFloatingText(text, x, y, color = '#ffffff', size = 28) {
+  floatingTexts.push({ text, x, y, color, size, alpha: 1, vy: -1.9 });
+}
+
+function registerSliceHit(fruit, p1, p2) {
+  fruit.sliced = true;
+  if (fruit.isBomb) { handleBombHit(fruit); return true; }
+
+  playSound('slice');
+  splitFruit(fruit, Math.atan2(p2.y - p1.y, p2.x - p1.x));
+  createJuiceSplash(fruit.x, fruit.y, [fruit.skinOuter, fruit.fleshOuter, '#ffffff']);
+  score += fruit.points;
+  slicedCount++;
+  addFloatingText(`+${fruit.points}`, fruit.x, fruit.y - 15, '#ffffff', 28);
+
+  comboCount++;
+  lastComboPos = { x: fruit.x, y: fruit.y };
+  clearTimeout(comboTimer);
+  comboTimer = setTimeout(() => {
+    if (comboCount >= 3 && gameState === 'PLAYING') {
+      const bonus = comboCount * 10;
+      score += bonus;
+      playSound('combo');
+      addFloatingText(`COMBO x${comboCount}! +${bonus}`, lastComboPos.x, lastComboPos.y - 45, '#C1D653', 30);
+      updateHUD();
+    }
+    comboCount = 0;
+  }, 240);
+
+  updateHUD();
+  return false;
+}
+
+// 5. RENDER BUAH & BOM
+function drawColorfulFruit(ctx, f, halfSide = 0) {
+  const r = f.radius;
+  ctx.save();
+  ctx.translate(f.x, f.y);
+  ctx.rotate(f.rotation);
+
+  if (halfSide !== 0) {
+    ctx.beginPath();
+    if (halfSide === -1) ctx.rect(-r * 1.45, -r * 1.45, r * 1.45, r * 2.9);
+    else ctx.rect(0, -r * 1.45, r * 1.45, r * 2.9);
+    ctx.clip();
+  }
+
+  if (f.isBomb) {
+    ctx.shadowColor = '#ff0055';
+    ctx.shadowBlur = 24;
+    const g = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+    g.addColorStop(0, '#5c677d'); g.addColorStop(0.55, '#1e2235'); g.addColorStop(1, '#08090f');
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.lineWidth = 4; ctx.strokeStyle = '#F57D44'; ctx.stroke();
+
+    ctx.fillStyle = '#334155';
+    ctx.fillRect(-10, -r - 6, 20, 10);
+
+    ctx.strokeStyle = '#FEE08E'; ctx.lineWidth = 5;
+    ctx.beginPath(); ctx.moveTo(0, -r - 6); ctx.quadraticCurveTo(14, -r - 22, 26, -r - 14); ctx.stroke();
+
+    ctx.fillStyle = '#F57D44'; ctx.shadowColor = '#F57D44'; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(26, -r - 14, 7.5, 0, Math.PI * 2); ctx.fill();
+
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = '#ff4d5a'; ctx.lineWidth = 6; ctx.lineCap = 'round';
+    const c = r * 0.34;
+    ctx.beginPath();
+    ctx.moveTo(-c, -c); ctx.lineTo(c, c);
+    ctx.moveTo(c, -c); ctx.lineTo(-c, c);
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.28)';
+    ctx.beginPath(); ctx.ellipse(-r * 0.35, -r * 0.35, r * 0.22, r * 0.12, -Math.PI / 4, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    return;
+  }
+
+  ctx.shadowColor = f.skinOuter;
+  ctx.shadowBlur = 22;
+  const skin = ctx.createRadialGradient(-r * 0.3, -r * 0.3, r * 0.1, 0, 0, r);
+  skin.addColorStop(0, f.skinOuter); skin.addColorStop(1, f.skinInner);
+  ctx.fillStyle = skin;
+  ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.fill();
+
+  ctx.shadowBlur = 0;
+  ctx.lineWidth = 3; ctx.strokeStyle = 'rgba(255,255,255,0.55)'; ctx.stroke();
+
+  if (f.name === 'Semangka' && halfSide === 0) {
+    ctx.strokeStyle = '#2b4506'; ctx.lineWidth = 6.5;
+    for (let s = -1; s <= 1; s++) {
+      ctx.beginPath(); ctx.arc(s * r * 0.38, 0, r * 0.72, -Math.PI * 0.38, Math.PI * 0.38); ctx.stroke();
+    }
+  }
+
+  if (halfSide !== 0 || f.showFleshWhole) {
+    const fr = r * 0.82;
+    const flesh = ctx.createRadialGradient(0, 0, fr * 0.1, 0, 0, fr);
+    flesh.addColorStop(0, f.fleshInner); flesh.addColorStop(1, f.fleshOuter);
+    ctx.fillStyle = flesh;
+    ctx.beginPath(); ctx.arc(0, 0, fr, 0, Math.PI * 2); ctx.fill();
+
+    ctx.fillStyle = f.seedColor;
+    for (let k = 0; k < 8; k++) {
+      const ang = (k * Math.PI * 2) / 8;
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(ang) * fr * 0.56, Math.sin(ang) * fr * 0.56, 4.8, 2.6, ang, 0, Math.PI * 2);
+      ctx.fill();
+    }
+  }
+
+  if (f.hasLeaf && halfSide === 0) {
+    ctx.fillStyle = '#769F13';
+    ctx.beginPath(); ctx.ellipse(8, -r + 2, 17, 8.5, -0.45, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = '#C1D653'; ctx.lineWidth = 2; ctx.stroke();
+  }
+
+  ctx.fillStyle = 'rgba(255,255,255,0.42)';
+  ctx.beginPath(); ctx.ellipse(-r * 0.34, -r * 0.34, r * 0.26, r * 0.14, -Math.PI / 4, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+}
+
+// 6. RENDER LOOP
+function render() {
+  const now = performance.now();
+
+  frameCount++;
+  if (now - lastFpsUpdate >= 500) {
+    fpsDisplay.innerText = `FPS: ${Math.round((frameCount * 1000) / (now - lastFpsUpdate))}`;
+    frameCount = 0;
+    lastFpsUpdate = now;
+  }
+
+  canvasCtx.save();
+
+  if (screenShake > 0) {
+    canvasCtx.translate((Math.random() - 0.5) * screenShake, (Math.random() - 0.5) * screenShake);
+    screenShake *= 0.88;
+    if (screenShake < 0.5) screenShake = 0;
+  }
+
+  // Video webcam (mirror) + lapisan hangat tipis
+  canvasCtx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+  canvasCtx.save();
+  canvasCtx.scale(-1, 1);
+  canvasCtx.translate(-canvasElement.width, 0);
+  canvasCtx.drawImage(videoElement, 0, 0, canvasElement.width, canvasElement.height);
+  canvasCtx.restore();
+  canvasCtx.fillStyle = 'rgba(60, 30, 10, 0.18)';
+  canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+
+  sliceTrail = sliceTrail.filter(p => now - p.t < TRAIL_LIFETIME);
+
+  if (gameState === 'PLAYING') {
+    if (now - lastSpawnTime > Math.max(1150, 2100 - score * 1.5)) {
+      spawnWave();
+      lastSpawnTime = now;
+    }
+
+    let bombTriggered = false;
+    for (let i = 1; i < sliceTrail.length && !bombTriggered; i++) {
+      const p = sliceTrail[i];
+      if (p.start) continue;
+      const prev = sliceTrail[i - 1];
+      const speed = Math.hypot(p.x - prev.x, p.y - prev.y) / Math.max(1, p.t - prev.t);
+      if (speed >= MIN_SLICE_SPEED && (now - p.t) < 180) {
+        for (const fruit of fruits) {
+          if (!fruit.sliced && lineCircleIntersect(prev.x, prev.y, p.x, p.y, fruit.x, fruit.y, fruit.radius + 10)) {
+            bombTriggered = registerSliceHit(fruit, prev, p);
+            if (bombTriggered) break;
+          }
+        }
+      }
+    }
+  }
+
+  const gravity = 0.25;
+  for (let i = fruits.length - 1; i >= 0; i--) {
+    const f = fruits[i];
+    if (gameState === 'PLAYING') {
+      f.x += f.vx; f.y += f.vy; f.vy += gravity; f.rotation += f.vRot;
+    }
+    if (f.sliced) { fruits.splice(i, 1); continue; }
+
+    if (f.y > canvasElement.height + 85 && f.vy > 0) {
+      if (!f.isBomb && gameState === 'PLAYING') {
+        lives--;
+        updateHUD();
+        addFloatingText('Terlewat!', Math.min(Math.max(f.x, 90), canvasElement.width - 90), canvasElement.height - 40, '#ff6b6b', 24);
+        if (lives <= 0) endGame('Nyawa Habis!');
+      }
+      fruits.splice(i, 1);
+      continue;
+    }
+    drawColorfulFruit(canvasCtx, f, 0);
+  }
+
+  for (let i = slicedHalves.length - 1; i >= 0; i--) {
+    const h = slicedHalves[i];
+    h.x += h.vx; h.y += h.vy; h.vy += gravity * 1.1; h.rotation += h.vRot; h.alpha -= 0.016;
+    if (h.alpha <= 0 || h.y > canvasElement.height + 95) { slicedHalves.splice(i, 1); continue; }
+    canvasCtx.save();
+    canvasCtx.globalAlpha = Math.max(0, h.alpha);
+    drawColorfulFruit(canvasCtx, h, h.side);
+    canvasCtx.restore();
+  }
+
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const pt = particles[i];
+    pt.x += pt.vx; pt.y += pt.vy; pt.vy += 0.16; pt.alpha -= 0.022;
+    if (pt.alpha <= 0) { particles.splice(i, 1); continue; }
+    canvasCtx.save();
+    canvasCtx.globalAlpha = pt.alpha;
+    canvasCtx.fillStyle = pt.color;
+    canvasCtx.shadowColor = pt.color;
+    canvasCtx.shadowBlur = 8;
+    canvasCtx.beginPath(); canvasCtx.arc(pt.x, pt.y, pt.radius, 0, Math.PI * 2); canvasCtx.fill();
+    canvasCtx.restore();
+  }
+
+  drawSliceTrail(now);
+
+  for (let i = floatingTexts.length - 1; i >= 0; i--) {
+    const ft = floatingTexts[i];
+    ft.y += ft.vy; ft.alpha -= 0.018;
+    if (ft.alpha <= 0) { floatingTexts.splice(i, 1); continue; }
+    canvasCtx.save();
+    canvasCtx.globalAlpha = ft.alpha;
+    canvasCtx.font = `700 ${ft.size}px 'Fredoka', sans-serif`;
+    canvasCtx.textAlign = 'center';
+    canvasCtx.fillStyle = ft.color;
+    canvasCtx.shadowColor = 'rgba(40,20,5,0.85)';
+    canvasCtx.shadowBlur = 8;
+    canvasCtx.fillText(ft.text, ft.x, ft.y);
+    canvasCtx.restore();
+  }
+
+  if (flashAlpha > 0) {
+    canvasCtx.fillStyle = `rgba(255, 248, 224, ${flashAlpha})`;
+    canvasCtx.fillRect(0, 0, canvasElement.width, canvasElement.height);
+    flashAlpha -= 0.05;
+  }
+
+  canvasCtx.restore();
+  requestAnimationFrame(render);
+}
+
+function drawSliceTrail(now) {
+  if (sliceTrail.length === 0) return;
+  canvasCtx.save();
+  canvasCtx.lineCap = 'round';
+  canvasCtx.lineJoin = 'round';
+
+  for (let i = 1; i < sliceTrail.length; i++) {
+    const p = sliceTrail[i];
+    if (p.start) continue;
+    const prev = sliceTrail[i - 1];
+    const next = (i + 1 < sliceTrail.length && !sliceTrail[i + 1].start) ? sliceTrail[i + 1] : p;
+    const life = Math.max(0.12, 1 - (now - p.t) / TRAIL_LIFETIME);
+    const midX = (p.x + next.x) / 2, midY = (p.y + next.y) / 2;
+    const pmX = (i > 1 && !prev.start) ? (sliceTrail[i - 2].x + prev.x) / 2 : prev.x;
+    const pmY = (i > 1 && !prev.start) ? (sliceTrail[i - 2].y + prev.y) / 2 : prev.y;
+
+    // Aura luar: kuning Daisy dengan cahaya Mandarin
+    canvasCtx.globalAlpha = life * 0.9;
+    canvasCtx.strokeStyle = '#FEE08E';
+    canvasCtx.shadowColor = '#F57D44';
+    canvasCtx.shadowBlur = 18;
+    canvasCtx.lineWidth = 7 + 15 * life;
+    canvasCtx.beginPath(); canvasCtx.moveTo(pmX, pmY); canvasCtx.quadraticCurveTo(p.x, p.y, midX, midY); canvasCtx.stroke();
+
+    // Inti bilah putih
+    canvasCtx.globalAlpha = Math.min(1, life * 1.1);
+    canvasCtx.strokeStyle = '#ffffff';
+    canvasCtx.shadowColor = '#ffffff';
+    canvasCtx.shadowBlur = 6;
+    canvasCtx.lineWidth = 3 + 6 * life;
+    canvasCtx.beginPath(); canvasCtx.moveTo(pmX, pmY); canvasCtx.quadraticCurveTo(p.x, p.y, midX, midY); canvasCtx.stroke();
+  }
+
+  const tip = sliceTrail[sliceTrail.length - 1];
+  if (now - tip.t < 200) {
+    canvasCtx.globalAlpha = 1;
+    canvasCtx.fillStyle = '#ffffff';
+    canvasCtx.shadowColor = '#F57D44';
+    canvasCtx.shadowBlur = 18;
+    canvasCtx.beginPath(); canvasCtx.arc(tip.x, tip.y, 9, 0, Math.PI * 2); canvasCtx.fill();
+  }
+  canvasCtx.restore();
+}
+
+// 7. KAMERA
+const camera = new Camera(videoElement, {
+  onFrame: async () => { await hands.send({ image: videoElement }); },
+  width: 640,
+  height: 480
+});
+
+camera.start()
+  .then(() => requestAnimationFrame(render))
+  .catch(err => {
+    statusDot.className = 'dot error';
+    statusText.innerText = 'Error Kamera: ' + err.message + ' (Pastikan izin webcam aktif)';
+    startBtn.innerText = 'Kamera Tidak Terdeteksi';
+  });
+</script>
+</body>
+</html>
